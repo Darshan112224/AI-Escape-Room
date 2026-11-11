@@ -38,6 +38,8 @@ st.set_page_config(page_title="AI Escape Room · V1", page_icon="🔐", layout="
 def init_game() -> None:
     """Create a fresh game in session_state."""
     st.session_state.messages = [{"role": "assistant", "content": OPENING_SCENE}]
+    st.session_state.escaped = False
+    st.session_state.turns = 0
 
 
 if "messages" not in st.session_state:  # first visit → new game
@@ -62,6 +64,13 @@ Type what you want to do in plain English, for example:
 Stuck? Ask the Game Master for a **hint**.
         """
     )
+    st.divider()
+    st.metric("Turns taken", st.session_state.turns)
+    # A button returns True only in the rerun right after it was clicked.
+    if st.button("🔄 Restart game", use_container_width=True):
+        init_game()
+        st.rerun()  # immediately re-run the script so the fresh game is shown
+
     st.caption(f"Version 1 · Model: `{MODEL_NAME}`")
 
 
@@ -92,9 +101,23 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
+def show_victory() -> None:
+    st.balloons()
+    st.success(
+        f"🎉 **You escaped The Locked Library in {st.session_state.turns} turns!** "
+        "Click *Restart game* in the sidebar to play again."
+    )
+
+
+# Game over → show the victory banner and don't accept more input.
+if st.session_state.escaped:
+    show_victory()
+    st.stop()
+
 # `:=` is the "walrus operator" (Python 3.8+): it assigns AND tests in one step.
 # st.chat_input returns the typed text, or None if nothing was sent this run.
 if player_input := st.chat_input("What do you do?"):
+    st.session_state.turns += 1
     st.session_state.messages.append({"role": "user", "content": player_input})
     with st.chat_message("user", avatar="🧑"):
         st.markdown(player_input)
@@ -106,8 +129,15 @@ if player_input := st.chat_input("What do you do?"):
             except GameMasterError as e:
                 # Remove the unanswered message so the history stays consistent.
                 st.session_state.messages.pop()
+                st.session_state.turns -= 1
                 st.error(str(e))
                 st.stop()
+        # The LLM decides whether the player won (V1 weakness, see game_master.py).
+        escaped, reply = GameMaster.check_escape(reply)
         st.markdown(reply)
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
+
+    if escaped:
+        st.session_state.escaped = True
+        st.rerun()  # rerun so the victory screen appears and input is disabled
