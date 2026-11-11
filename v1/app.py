@@ -29,7 +29,7 @@ from prompts import OPENING_SCENE
 # The .env lives in the project root (one folder above v1/).
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 
 st.set_page_config(page_title="AI Escape Room · V1", page_icon="🔐", layout="centered")
 
@@ -71,8 +71,6 @@ Stuck? Ask the Game Master for a **hint**.
         init_game()
         st.rerun()  # immediately re-run the script so the fresh game is shown
 
-    st.caption(f"Version 1 · Model: `{MODEL_NAME}`")
-
 
 # --- Main area ---------------------------------------------------------------
 st.title("🔐 AI Escape Room")
@@ -94,6 +92,10 @@ def get_game_master(api_key: str, model_name: str) -> GameMaster:
 
 
 game_master = get_game_master(API_KEY, MODEL_NAME)
+
+# Placeholder in the sidebar; filled at the end of the script so it shows the
+# model that was ACTUALLY used (it may differ after an automatic fallback).
+model_caption = st.sidebar.empty()
 
 # Draw the chat so far. st.chat_message gives the nice chat-bubble layout.
 for msg in st.session_state.messages:
@@ -141,3 +143,5 @@ if player_input := st.chat_input("What do you do?"):
     if escaped:
         st.session_state.escaped = True
         st.rerun()  # rerun so the victory screen appears and input is disabled
+
+model_caption.caption(f"Version 1 · Model: `{game_master.model_name}`")

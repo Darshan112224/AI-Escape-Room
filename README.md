@@ -69,6 +69,10 @@ streamlit run v1/app.py
 
 The app opens at http://localhost:8501.
 
+> **"Model not found" error?** Google retires model names over time. The app falls
+> back to other Flash models automatically, but you can also run
+> `python v1/list_models.py` and copy a model name into `GEMINI_MODEL` in `.env`.
+
 ### Running the tests
 
 ```bash
@@ -96,6 +100,7 @@ v1/
 ├── app.py               # Streamlit UI
 ├── game_master.py       # Gemini client: history, retries, escape detection
 ├── prompts.py           # Opening scene + Game Master system prompt
+├── list_models.py       # Helper: shows which Gemini models your key can use
 ├── test_game_master.py  # Unit tests (fake client)
 └── test_app.py          # Headless UI tests (Streamlit AppTest)
 ```

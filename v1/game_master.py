@@ -29,6 +29,16 @@ from prompts import ESCAPE_MARKER, GAME_MASTER_PROMPT
 # 429 = too many requests (free-tier rate limit), 500/503 = server busy.
 RETRYABLE_CODES = {429, 500, 503}
 
+# Google retires model names every few months (e.g. gemini-2.5-flash -> 404).
+# If the configured model is gone, we automatically try these in order.
+FALLBACK_MODELS = [
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-latest",  # alias that always points to the newest Flash
+]
+
 
 class GameMasterError(Exception):
     """Raised with a user-friendly message when the LLM call fails."""
@@ -38,14 +48,16 @@ class GameMaster:
     def __init__(
         self,
         api_key: str,
-        model_name: str = "gemini-flash-latest",
+        model_name: str = "gemini-3.5-flash",
         temperature: float = 0.8,
         client: genai.Client | None = None,
     ):
         # Dependency injection: tests can pass a fake `client`, so we can test
         # the logic without a real API key or network access.
         self.client = client or genai.Client(api_key=api_key)
-        self.model_name = model_name
+        # Models to try, in order: the one from .env first, then the fallbacks.
+        self.candidate_models = [model_name] + [m for m in FALLBACK_MODELS if m != model_name]
+        self.model_name = model_name  # the model currently in use
         # GenerateContentConfig bundles the settings sent with every request.
         # temperature: 0 = predictable, higher = more creative. 0.8 gives lively
         # descriptions (and, as we will see, also more chance of rule-bending).
@@ -82,8 +94,10 @@ class GameMaster:
     def respond(self, history: list[dict], max_retries: int = 3) -> str:
         """Send the full conversation to Gemini and return the Game Master's reply."""
         contents = self._to_gemini_contents(history)
+        attempt = 0
 
-        for attempt in range(1, max_retries + 1):
+        while True:
+            attempt += 1
             try:
                 response = self.client.models.generate_content(
                     model=self.model_name,
@@ -97,6 +111,19 @@ class GameMaster:
                 return text
 
             except errors.APIError as e:
+                # Model is gone (404), or not on the free tier ("limit: 0" quota)
+                # → switch to the next candidate model and try again right away.
+                not_free = e.code == 429 and "limit: 0" in str(e)
+                if e.code == 404 or not_free:
+                    if self._switch_to_next_model():
+                        attempt = 0
+                        continue
+                    raise GameMasterError(
+                        f"None of the models {self.candidate_models} worked for your key. "
+                        "Run `python v1/list_models.py` to see which models you can use, "
+                        "then set GEMINI_MODEL in .env."
+                    ) from e
+
                 if e.code in RETRYABLE_CODES and attempt < max_retries:
                     # Exponential backoff: wait 2s, 4s, 8s ... before retrying.
                     time.sleep(2 ** attempt)
@@ -109,13 +136,15 @@ class GameMaster:
                     raise GameMasterError(
                         "Gemini rejected the request. Check that GEMINI_API_KEY in your .env is valid."
                     ) from e
-                if e.code == 404:
-                    raise GameMasterError(
-                        f"Model '{self.model_name}' was not found. Set GEMINI_MODEL in .env to a current model."
-                    ) from e
                 raise GameMasterError(f"Gemini API error ({e.code}). Please try again.") from e
 
-        raise GameMasterError("The Game Master did not respond. Please try again.")
+    def _switch_to_next_model(self) -> bool:
+        """Move to the next candidate model. Returns False if none are left."""
+        idx = self.candidate_models.index(self.model_name)
+        if idx + 1 >= len(self.candidate_models):
+            return False
+        self.model_name = self.candidate_models[idx + 1]
+        return True
 
     # ------------------------------------------------------------------ #
     @staticmethod

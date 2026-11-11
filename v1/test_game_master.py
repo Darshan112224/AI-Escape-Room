@@ -76,3 +76,17 @@ def test_invalid_key_gives_friendly_error():
     gm, _ = make_gm(errors.APIError(401, {}))
     with pytest.raises(GameMasterError, match="GEMINI_API_KEY"):
         gm.respond(HISTORY)
+
+
+def test_retired_model_falls_back_to_next_model():
+    # First model returns 404 (retired), the next one works.
+    gm, models = make_gm(errors.APIError(404, {}), "Hello from the fallback model")
+    gm.model_name = gm.candidate_models[0] = "gemini-2.5-flash"
+    assert gm.respond(HISTORY) == "Hello from the fallback model"
+    assert gm.model_name != "gemini-2.5-flash"  # remembered for next turns
+
+
+def test_all_models_missing_gives_helpful_error():
+    gm, _ = make_gm(*[errors.APIError(404, {})] * 10)
+    with pytest.raises(GameMasterError, match="list_models.py"):
+        gm.respond(HISTORY)
