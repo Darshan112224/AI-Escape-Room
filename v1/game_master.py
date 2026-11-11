@@ -34,6 +34,9 @@ log = logging.getLogger("game_master")
 # Give up on a single request after this many seconds instead of waiting forever.
 # (The Gemini SDK has NO timeout by default, so a stuck request would hang the UI.)
 REQUEST_TIMEOUT_SECONDS = 30
+# When Gemini is busy, try at most this many different models in one turn,
+# so the player never waits more than ~1.5 minutes in the worst case.
+MAX_MODELS_PER_TURN = 3
 
 
 def _timeout_exceptions() -> tuple[type[BaseException], ...]:
@@ -126,9 +129,23 @@ class GameMaster:
 
     # ------------------------------------------------------------------ #
     def respond(self, history: list[dict], max_retries: int = 2) -> str:
-        """Send the full conversation to Gemini and return the Game Master's reply."""
+        """
+        Send the full conversation to Gemini and return the Game Master's reply.
+
+        Error-handling strategy:
+          • 404 / zero free quota → this model is unusable for us: drop it
+                                    from the list and try the next model.
+          • 429 / 500 / 503 / timeout → temporary trouble (rate limit or
+                                    overloaded server): retry the same model
+                                    with backoff, then try the NEXT model,
+                                    because overload is usually per model.
+          • 400 / 401 / 403       → our request or key is wrong: stop and
+                                    tell the player what to fix.
+        """
         contents = self._to_gemini_contents(history)
+        models_tried = 1
         attempt = 0
+        last_problem = ""
 
         while True:
             attempt += 1
@@ -147,51 +164,67 @@ class GameMaster:
                     return "The Game Master stays silent for a moment... (try rephrasing your action)"
                 return text
 
-            except TIMEOUT_EXCEPTIONS as e:
-                # The request took longer than REQUEST_TIMEOUT_SECONDS.
+            except TIMEOUT_EXCEPTIONS:
                 log.warning("Timed out after %ds", REQUEST_TIMEOUT_SECONDS)
-                if attempt < max_retries:
-                    continue
-                raise GameMasterError(
-                    "Gemini is taking too long to answer. Please try again in a moment."
-                ) from e
+                code, last_problem = "timeout", "Gemini is taking too long to answer."
 
             except errors.APIError as e:
                 log.warning("Gemini error %s: %s", e.code, str(e)[:200])
-                # Model is gone (404), or not on the free tier ("limit: 0" quota)
-                # → switch to the next candidate model and try again right away.
+                code = e.code
+
+                # --- Permanent problem with THIS model → drop it -------------
                 not_free = e.code == 429 and "limit: 0" in str(e)
                 if e.code == 404 or not_free:
-                    if self._switch_to_next_model():
+                    if self._drop_current_model():
                         attempt = 0
                         continue
                     raise GameMasterError(
-                        f"None of the models {self.candidate_models} worked for your key. "
+                        "None of the configured Gemini models work for your key. "
                         "Run `python v1/list_models.py` to see which models you can use, "
                         "then set GEMINI_MODEL in .env."
                     ) from e
 
-                if e.code in RETRYABLE_CODES and attempt < max_retries:
-                    # Exponential backoff: wait 2s, 4s, 8s ... before retrying.
-                    time.sleep(2 ** attempt)
-                    continue
-                if e.code == 429:
-                    raise GameMasterError(
-                        "Rate limit reached on the free Gemini tier. Wait a minute and try again."
-                    ) from e
+                # --- Our fault → no point retrying ---------------------------
                 if e.code in (400, 401, 403):
                     raise GameMasterError(
                         "Gemini rejected the request. Check that GEMINI_API_KEY in your .env is valid."
                     ) from e
-                raise GameMasterError(f"Gemini API error ({e.code}). Please try again.") from e
 
-    def _switch_to_next_model(self) -> bool:
-        """Move to the next candidate model. Returns False if none are left."""
+                if e.code == 429:
+                    last_problem = "Rate limit reached on the free Gemini tier."
+                elif e.code in (500, 503):
+                    last_problem = "Gemini's servers are overloaded right now."
+                else:
+                    raise GameMasterError(f"Gemini API error ({e.code}). Please try again.") from e
+
+            # --- Temporary problem (timeout / 429 / 5xx) ----------------------
+            # A timeout already cost us 30s, so don't retry the same model.
+            if attempt < max_retries and code != "timeout":
+                # Exponential backoff: wait 2s, 4s, ... before retrying.
+                time.sleep(2 ** attempt)
+                continue
+            if models_tried < min(len(self.candidate_models), MAX_MODELS_PER_TURN):
+                self._rotate_model()
+                models_tried += 1
+                attempt = 0
+                log.info("Switching to %s", self.model_name)
+                continue
+            raise GameMasterError(f"{last_problem} Please wait a minute and try again.")
+
+    def _drop_current_model(self) -> bool:
+        """Remove an unusable model (e.g. retired). Returns False if none are left."""
         idx = self.candidate_models.index(self.model_name)
-        if idx + 1 >= len(self.candidate_models):
+        self.candidate_models.pop(idx)
+        if not self.candidate_models:
             return False
-        self.model_name = self.candidate_models[idx + 1]
+        self.model_name = self.candidate_models[idx % len(self.candidate_models)]
+        log.info("Model unavailable, switching to %s", self.model_name)
         return True
+
+    def _rotate_model(self) -> None:
+        """Move to the next model in the list (wrapping around to the start)."""
+        idx = self.candidate_models.index(self.model_name)
+        self.model_name = self.candidate_models[(idx + 1) % len(self.candidate_models)]
 
     # ------------------------------------------------------------------ #
     @staticmethod

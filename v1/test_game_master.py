@@ -92,10 +92,20 @@ def test_all_models_missing_gives_helpful_error():
         gm.respond(HISTORY)
 
 
-def test_timeout_retries_then_gives_friendly_error():
+def test_timeout_everywhere_gives_friendly_error():
     # Use whichever timeout exception the installed SDK actually raises.
     exc = game_master.TIMEOUT_EXCEPTIONS[-1]("request too slow")
-    gm, models = make_gm(exc, exc)
+    gm, models = make_gm(*[exc] * 20)
     with pytest.raises(GameMasterError, match="too long"):
         gm.respond(HISTORY)
-    assert len(models.calls) == 2  # retried once before giving up
+    # 1 attempt per model (no same-model retry after a timeout), max 3 models
+    assert len(models.calls) == game_master.MAX_MODELS_PER_TURN
+
+
+def test_overloaded_model_503_switches_to_another_model(monkeypatch):
+    monkeypatch.setattr(game_master.time, "sleep", lambda s: None)
+    gm, models = make_gm(errors.APIError(503, {}), errors.APIError(503, {}), "Reply from backup model")
+    first_model = gm.model_name
+    assert gm.respond(HISTORY) == "Reply from backup model"
+    assert gm.model_name != first_model
+    assert len(models.calls) == 3  # 2 tries on busy model + 1 on the next
