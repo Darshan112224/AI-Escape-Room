@@ -1,0 +1,162 @@
+{
+  "room": {
+    "name": "The Locked Library",
+    "opening_scene": "You wake up on a cold wooden floor. Dust hangs in the pale light of a single reading lamp. You are in an **old library**, and the heavy oak door behind you is locked. A small brass keypad glows beside it, waiting for a **four-digit code**.\n\nLooking around, you see a **writing desk** with a **locked drawer**, a tall **bookshelf**, a **painting** of a clock tower hanging slightly crooked on the wall, and the **reading lamp** humming softly in the corner.\n\n*What do you do?*",
+    "look_around": "You are in an old library. You can see a writing desk with a drawer, a tall bookshelf, a painting of a clock tower, a reading lamp and the heavy oak exit door with its brass keypad."
+  },
+
+  "objects": {
+    "desk": {
+      "name": "writing desk",
+      "aliases": ["desk", "writing desk", "table", "wooden desk"],
+      "visible": true,
+      "descriptions": {
+        "default": "An old wooden writing desk. A folded note lies on top, and a small drawer with a keyhole is built into the front."
+      },
+      "on_examine": { "set_flags": ["desk_examined"] }
+    },
+
+    "note": {
+      "name": "folded note",
+      "aliases": ["note", "folded note", "paper", "letter", "message"],
+      "visible": true,
+      "takeable": true,
+      "readable": true,
+      "descriptions": { "default": "A folded piece of yellowed paper with handwriting on it." },
+      "text": "\"Time hides behind the art. The seasons keep the final secret.\"",
+      "on_read": { "set_flags": ["note_read"] }
+    },
+
+    "painting": {
+      "name": "painting",
+      "aliases": ["painting", "picture", "art", "artwork", "clock tower", "frame", "portrait"],
+      "visible": true,
+      "movable": true,
+      "descriptions": {
+        "default": "An oil painting of a clock tower. It hangs slightly crooked, and the frame looks loose, as if it has been moved before.",
+        "painting_moved": "The clock tower painting hangs crooked where you moved it. The wall behind it is bare now."
+      },
+      "on_examine": { "set_flags": ["painting_examined"] },
+      "on_move": {
+        "set_flags": ["painting_moved"],
+        "reveal": ["brass_key"],
+        "message": "You lift the painting away from the wall. Taped to the back of the frame is a small brass key."
+      },
+      "already_moved_message": "You have already looked behind the painting."
+    },
+
+    "brass_key": {
+      "name": "brass key",
+      "aliases": ["key", "brass key", "small key", "small brass key"],
+      "visible": false,
+      "takeable": true,
+      "descriptions": { "default": "A small, slightly tarnished brass key." },
+      "on_take": { "set_flags": ["brass_key_taken"] }
+    },
+
+    "drawer": {
+      "name": "drawer",
+      "aliases": ["drawer", "locked drawer", "desk drawer", "keyhole"],
+      "visible": true,
+      "descriptions": {
+        "default": "A small drawer built into the desk. It is locked, with a tiny brass keyhole.",
+        "drawer_unlocked": "The desk drawer stands open."
+      },
+      "lock": {
+        "key": "brass_key",
+        "unlocked_flag": "drawer_unlocked",
+        "locked_message": "The drawer is locked. It needs a key.",
+        "wrong_item_message": "That doesn't fit the drawer's tiny keyhole.",
+        "on_unlock": {
+          "set_flags": ["drawer_unlocked"],
+          "reveal": ["diary_page"],
+          "message": "The brass key turns with a click and the drawer slides open. Inside lies a torn diary page."
+        },
+        "already_unlocked_message": "The drawer is already open."
+      }
+    },
+
+    "diary_page": {
+      "name": "diary page",
+      "aliases": ["diary page", "diary", "page", "torn page", "torn diary page"],
+      "visible": false,
+      "takeable": true,
+      "readable": true,
+      "descriptions": { "default": "A torn page from an old diary, covered in faded ink." },
+      "text": "\"The year turns in order: Spring wakes, Summer burns, Autumn falls, Winter sleeps.\"",
+      "on_read": { "set_flags": ["diary_page_read"] }
+    },
+
+    "bookshelf": {
+      "name": "bookshelf",
+      "aliases": ["bookshelf", "shelf", "shelves", "bookcase", "book shelf"],
+      "visible": true,
+      "descriptions": {
+        "default": "Tall shelves full of dusty books. Four books with seasonal titles stick out slightly, standing from left to right: \"Winter's Silence\", \"Autumn Leaves\", \"Spring Awakening\" and \"Summer of Fire\"."
+      },
+      "on_examine": { "set_flags": ["bookshelf_examined"], "reveal": ["season_books"] }
+    },
+
+    "season_books": {
+      "name": "four season books",
+      "aliases": ["books", "four books", "season books", "seasonal books", "the books",
+                  "winter's silence", "autumn leaves", "spring awakening", "summer of fire",
+                  "winter", "autumn", "spring", "summer", "book"],
+      "visible": false,
+      "readable": true,
+      "descriptions": {
+        "default": "You open each of the four seasonal books. Inside every cover is a single handwritten digit: \"Winter's Silence\" has 8, \"Autumn Leaves\" has 5, \"Spring Awakening\" has 4 and \"Summer of Fire\" has 1."
+      },
+      "text": "Inside the covers: \"Winter's Silence\" = 8, \"Autumn Leaves\" = 5, \"Spring Awakening\" = 4, \"Summer of Fire\" = 1.",
+      "on_examine": { "set_flags": ["book_digits_found"] },
+      "on_read": { "set_flags": ["book_digits_found"] }
+    },
+
+    "lamp": {
+      "name": "reading lamp",
+      "aliases": ["lamp", "reading lamp", "light", "brass lamp"],
+      "visible": true,
+      "descriptions": {
+        "default": "An old brass reading lamp that hums softly. It gives a warm light, but there is nothing hidden here."
+      }
+    },
+
+    "door": {
+      "name": "exit door",
+      "aliases": ["door", "exit", "exit door", "oak door", "keypad", "lock", "code lock", "brass keypad"],
+      "visible": true,
+      "descriptions": {
+        "default": "A heavy oak door, firmly locked. Beside it, a brass keypad waits for a four-digit code.",
+        "door_open": "The heavy oak door stands wide open."
+      }
+    }
+  },
+
+  "door": {
+    "object": "door",
+    "code_length": 4,
+    "solution_code": "4158",
+    "requires_flags": ["diary_page_read", "book_digits_found"],
+    "wrong_code_message": "The keypad buzzes and flashes red. The door stays locked.",
+    "missing_clues_message": "The keypad buzzes and flashes red. Typing numbers at random won't help; you haven't found all the clues for this lock yet.",
+    "success_message": "The keypad chimes and glows green. With a heavy clunk the bolts slide back and the oak door swings open. You are free!"
+  },
+
+  "puzzles": [
+    { "id": "hidden_key",   "title": "Find what hides behind the art", "requires_flags": ["brass_key_taken"] },
+    { "id": "locked_drawer", "title": "Open the locked drawer",        "requires_flags": ["drawer_unlocked"] },
+    { "id": "season_code",  "title": "Decode the seasons",             "requires_flags": ["diary_page_read", "book_digits_found"] },
+    { "id": "exit_door",    "title": "Unlock the exit door",           "requires_flags": ["door_open"] }
+  ],
+
+  "hints": [
+    { "unless_flag": "note_read",         "text": "The desk might hold a message worth reading." },
+    { "unless_flag": "painting_moved",    "text": "The note mentions art. Perhaps something is behind the painting." },
+    { "unless_flag": "brass_key_taken",   "text": "Something small was hidden behind the painting. Take it." },
+    { "unless_flag": "drawer_unlocked",   "text": "You have a key. Something in this room has a keyhole." },
+    { "unless_flag": "diary_page_read",   "text": "Read what you found in the drawer." },
+    { "unless_flag": "bookshelf_examined","text": "\"The seasons keep the final secret.\" Look at the bookshelf." },
+    { "unless_flag": "book_digits_found", "text": "Those four seasonal books look interesting. Open them." },
+    { "unless_flag": "door_open",         "text": "Arrange the book digits in the order the diary describes the year." }
+  ]
+}
