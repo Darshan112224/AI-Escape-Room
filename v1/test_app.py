@@ -21,7 +21,7 @@ class FakeClient:
 
     script: list[str] = []
 
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, **kwargs):  # **kwargs swallows http_options etc.
         self.models = SimpleNamespace(generate_content=self._generate)
 
     def _generate(self, model, contents, config):

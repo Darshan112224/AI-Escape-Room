@@ -90,3 +90,12 @@ def test_all_models_missing_gives_helpful_error():
     gm, _ = make_gm(*[errors.APIError(404, {})] * 10)
     with pytest.raises(GameMasterError, match="list_models.py"):
         gm.respond(HISTORY)
+
+
+def test_timeout_retries_then_gives_friendly_error():
+    # Use whichever timeout exception the installed SDK actually raises.
+    exc = game_master.TIMEOUT_EXCEPTIONS[-1]("request too slow")
+    gm, models = make_gm(exc, exc)
+    with pytest.raises(GameMasterError, match="too long"):
+        gm.respond(HISTORY)
+    assert len(models.calls) == 2  # retried once before giving up

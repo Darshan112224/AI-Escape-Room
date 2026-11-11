@@ -18,12 +18,42 @@ That is one of the main problems Version 2 solves.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from google import genai
 from google.genai import errors, types
 
 from prompts import ESCAPE_MARKER, GAME_MASTER_PROMPT
+
+# `logging` prints status lines to the TERMINAL where you ran `streamlit run`,
+# so you can see what is happening while the spinner is shown in the browser.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
+log = logging.getLogger("game_master")
+
+# Give up on a single request after this many seconds instead of waiting forever.
+# (The Gemini SDK has NO timeout by default, so a stuck request would hang the UI.)
+REQUEST_TIMEOUT_SECONDS = 30
+
+
+def _timeout_exceptions() -> tuple[type[BaseException], ...]:
+    """
+    Older google-genai versions use the `httpx` library, newer ones `httpx2`.
+    We collect the timeout exception from whichever is installed, so the code
+    works with both. (`importlib` lets us import a module by name at runtime.)
+    """
+    import importlib
+
+    found: list[type[BaseException]] = [TimeoutError]
+    for lib in ("httpx", "httpx2"):
+        try:
+            found.append(importlib.import_module(lib).TimeoutException)
+        except (ImportError, AttributeError):
+            pass
+    return tuple(found)
+
+
+TIMEOUT_EXCEPTIONS = _timeout_exceptions()
 
 # HTTP status codes that are usually temporary and worth retrying:
 # 429 = too many requests (free-tier rate limit), 500/503 = server busy.
@@ -54,7 +84,11 @@ class GameMaster:
     ):
         # Dependency injection: tests can pass a fake `client`, so we can test
         # the logic without a real API key or network access.
-        self.client = client or genai.Client(api_key=api_key)
+        # HttpOptions.timeout is in MILLISECONDS.
+        self.client = client or genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_SECONDS * 1000),
+        )
         # Models to try, in order: the one from .env first, then the fallbacks.
         self.candidate_models = [model_name] + [m for m in FALLBACK_MODELS if m != model_name]
         self.model_name = model_name  # the model currently in use
@@ -91,26 +125,39 @@ class GameMaster:
         return contents
 
     # ------------------------------------------------------------------ #
-    def respond(self, history: list[dict], max_retries: int = 3) -> str:
+    def respond(self, history: list[dict], max_retries: int = 2) -> str:
         """Send the full conversation to Gemini and return the Game Master's reply."""
         contents = self._to_gemini_contents(history)
         attempt = 0
 
         while True:
             attempt += 1
+            log.info("Asking %s (attempt %d, %d messages)...", self.model_name, attempt, len(contents))
+            started = time.perf_counter()
             try:
                 response = self.client.models.generate_content(
                     model=self.model_name,
                     contents=contents,
                     config=self.config,
                 )
+                log.info("Reply received in %.1fs", time.perf_counter() - started)
                 text = (response.text or "").strip()
                 if not text:
                     # Can happen if the response was blocked by a safety filter.
                     return "The Game Master stays silent for a moment... (try rephrasing your action)"
                 return text
 
+            except TIMEOUT_EXCEPTIONS as e:
+                # The request took longer than REQUEST_TIMEOUT_SECONDS.
+                log.warning("Timed out after %ds", REQUEST_TIMEOUT_SECONDS)
+                if attempt < max_retries:
+                    continue
+                raise GameMasterError(
+                    "Gemini is taking too long to answer. Please try again in a moment."
+                ) from e
+
             except errors.APIError as e:
+                log.warning("Gemini error %s: %s", e.code, str(e)[:200])
                 # Model is gone (404), or not on the free tier ("limit: 0" quota)
                 # → switch to the next candidate model and try again right away.
                 not_free = e.code == 429 and "limit: 0" in str(e)
