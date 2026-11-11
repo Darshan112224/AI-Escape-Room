@@ -54,8 +54,12 @@ RULES: list[tuple[re.Pattern, str, tuple[str, ...]]] = [
     (re.compile(r"^(?:look|look around|l|where am i|observe the room|look at the room|survey the room)$"), "look_around", ()),
     # "use the key on the drawer", "put key in drawer"
     (re.compile(r"^(?:use|put|insert|try)\s+(.+?)\s+(?:on|in|into|with|at)\s+(.+)$"), "use", ("item", "target")),
-    # "unlock the drawer with the key", "open drawer using key"
-    (re.compile(r"^(?:unlock|open)\s+(.+?)\s+(?:with|using)\s+(.+)$"), "use", ("target", "item")),
+    # "use the crowbar to break the door"
+    (re.compile(r"^(?:use|try)\s+(.+?)\s+to\s+\w+\s+(.+)$"), "use", ("item", "target")),
+    # "unlock the drawer with the key", "break the door with a crowbar"
+    (re.compile(r"^(?:unlock|open|break|smash|force|pry|hit)\s+(.+?)\s+(?:with|using)\s+(.+)$"), "use", ("target", "item")),
+    # "use the key" (no target given → the engine will ask "on what?")
+    (re.compile(r"^use\s+(.+)$"), "use", ("item",)),
     (re.compile(r"^(?:move|lift|push|pull|remove|turn over|take down|look behind|check behind|search behind)\s+(.+)$"), "move", ("target",)),
     (re.compile(r"^read\s+(.+)$"), "read", ("target",)),
     (re.compile(r"^(?:take|pick up|grab|get|collect)\s+(.+)$"), "take", ("target",)),
