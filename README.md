@@ -9,8 +9,10 @@ The project is built in two versions:
 | | Version 1: Interactive | Version 2: Reliable |
 |---|---|---|
 | Who decides outcomes? | The LLM | Python game engine |
-| Game state | Chat history only | Structured state (dict / JSON) |
-| Status | ✅ Done | 🚧 In progress |
+| Game state | Chat history only | Structured `GameState` + JSON game data |
+| Where are the solutions? | Inside the LLM prompt | Only in `game_data.json` (never sent to the LLM) |
+| Test cases passed | 4 / 9 | **9 / 9** |
+| Status | ✅ Done (tag `v1.0`) | ✅ Done |
 
 ---
 
@@ -63,8 +65,9 @@ pip install -r requirements.txt
 cp .env.example .env              # Windows: copy .env.example .env
 #    then open .env and paste your key from https://aistudio.google.com/apikey
 
-# 5. Run Version 1
-streamlit run v1/app.py
+# 5. Run a version
+streamlit run v1/app.py           # Version 1
+streamlit run v2/app.py           # Version 2 (also runs without an API key, in offline mode)
 ```
 
 The app opens at http://localhost:8501.
@@ -79,7 +82,8 @@ The app opens at http://localhost:8501.
 ### Running the tests
 
 ```bash
-cd v1 && pytest
+cd v1 && pytest      # 13 tests
+cd ../v2 && pytest   # 91 tests, including every test case from docs/test_cases.md
 ```
 
 The tests replace Gemini with a fake client, so they need **no API key**.
@@ -133,8 +137,58 @@ v1/
 
 ## 📦 Version 2: Reliable AI Escape Room
 
-🚧 Coming next: structured game state, Python action validation, inventory rules
-and adversarial testing.
+**Core principle: Python decides, the LLM describes.**
+
+Every turn goes through three stages:
+
+```
+"use the key on the drawer"
+      │
+ ① UNDERSTAND   Intent parser: regex rules first, Gemini (structured JSON output) as backup
+      │         → {"action": "use", "item": "key", "target": "drawer"}
+ ② DECIDE       GameEngine checks GameState: is the key in the inventory? Is the drawer locked?
+      │         → success / failure + approved facts. No LLM involved.
+ ③ DESCRIBE     Narrator (Gemini) turns the facts into story text.
+                Output guard: no leaked or invented numbers, no fake victory.
+```
+
+### What changed from V1, and why
+
+| V1 problem | V2 change | Why it was necessary |
+|---|---|---|
+| No memory except chat text | **`GameState` dataclass**: inventory, flags, solved puzzles, door, attempts, action log | The LLM forgot or misread state, e.g. using a key it never gave the player |
+| Solutions inside the prompt | **`game_data.json`**, read only by the engine | If the LLM knows the answer, it can leak it or be tricked into revealing it |
+| LLM decided success and victory | **`GameEngine`** validation functions; the door needs the code **and** the solved puzzles | A prompt can't *force* rule-following; code can |
+| Many actions in one message | Parser keeps **one action per turn** | The whole puzzle chain was skipped in one message |
+| Free-text understanding only | **Structured output** with a Pydantic schema | The LLM can only choose from 12 allowed actions; it cannot "decide" anything |
+| LLM text shown unchecked | **Output guard** + fallback to plain engine facts | Last line of defence against leaks and hallucinations |
+| Game unusable when the API failed | **Offline mode**: rules parser + engine work without an LLM | Free-tier quota and 503 errors were frequent in V1 testing |
+
+➡️ Architecture diagram and design decisions: [`docs/v2_architecture.md`](docs/v2_architecture.md)
+➡️ All test cases, V1 vs V2: [`docs/test_cases.md`](docs/test_cases.md)
+
+### V2 features
+
+- Live sidebar with **inventory, puzzle checklist, door status, turns, wrong codes**,
+  read from the real game state
+- **"Show engine decisions"** toggle: see the parsed intent, the engine's decision and the
+  output-guard result for every turn
+- Progressive **hints** chosen by the engine, based on progress
+- Hidden items answer exactly like nonexistent ones, so guessing names reveals nothing
+
+```
+v2/
+├── app.py               # Streamlit UI (state sidebar + debug panel)
+├── game.py              # Wires parser → engine → narrator into one turn
+├── game_data.json       # Room, objects, rules, hints and the secret solution
+├── game_state.py        # GameState dataclass (structured memory)
+├── engine.py            # Rule engine: validation + state changes (no LLM)
+├── intent.py            # Intent schema (Pydantic), the parser–engine contract
+├── intent_parser.py     # Hybrid parser: regex rules → Gemini structured output
+├── narrator.py          # LLM narration + output guard + offline fallback
+├── llm_client.py        # Shared Gemini client: timeout, retries, model fallback
+└── test_*.py            # 91 automated tests
+```
 
 ---
 

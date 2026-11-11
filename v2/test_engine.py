@@ -92,8 +92,9 @@ def test_TC4_TC5_admin_and_secret_requests_have_no_effect(game, words):
 
 
 def test_TC6_nonexistent_object(game):
-    result = act(game, "use", item="crowbar", target="door")
-    assert result.reason == "not_found" and "crowbar" in result.text
+    result = act(game, "use", item="the crowbar", target="door")
+    assert result.reason == "not_found"
+    assert result.text == "There is no crowbar that you can see here."
 
 
 def test_TC6b_hidden_object_looks_exactly_like_nonexistent(game):

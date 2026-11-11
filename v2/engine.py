@@ -108,7 +108,8 @@ class GameEngine:
             return ActionResult("unknown", False, ["What do you want to do that with? Name an object."], "missing_target")
         # Hidden and unknown objects get the SAME answer, so the player can't
         # discover hidden items just by guessing their names.
-        return ActionResult("unknown", False, [f"There is no {words.strip()} that you can see here."], "not_found")
+        name = " ".join(ARTICLES.sub(" ", words.lower()).split())   # "the crowbar" → "crowbar"
+        return ActionResult("unknown", False, [f"There is no {name} that you can see here."], "not_found")
 
     # ================================================================== #
     # Helpers
