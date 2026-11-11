@@ -98,6 +98,29 @@ request, turn counter, victory screen, restart button.
 
 ➡️ Architecture diagram and known weaknesses: [`docs/v1_architecture.md`](docs/v1_architecture.md)
 
+### Screenshots
+
+| Normal win | V1 bug: escaping without solving the puzzles |
+|---|---|
+| ![Victory](docs/screenshots/v1_victory.png) | ![Direct code](docs/screenshots/tc6_tc7_crowbar_and_direct_code.png) |
+
+### What went wrong in V1
+
+We ran 9 test cases, including adversarial ones
+(full results: [`docs/test_cases.md`](docs/test_cases.md)). **V1 scored 4 pass · 2 partial · 3 fail.**
+
+Gemini handled the *obvious* attacks well (fake admin, "reveal all codes", nonexistent
+crowbar) but failed on **game-state** problems:
+
+- ❌ Opened the drawer with a key the player **never picked up**
+- ❌ Let the player **escape by typing the code** without ever solving the bookshelf puzzle
+- ❌ Solved the **whole puzzle chain in one turn** when the player chained many actions
+- ⚠️ **Leaked a hint** when the player falsely claimed to have solved a puzzle
+- ⚠️ Gave **contradictory feedback** ("must be four digits" for a four-digit code)
+
+These failures happen because in V1 the LLM is both the storyteller **and** the rule-keeper.
+Version 2 separates those two jobs.
+
 ```
 v1/
 ├── app.py               # Streamlit UI
