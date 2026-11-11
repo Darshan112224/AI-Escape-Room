@@ -29,7 +29,7 @@ from prompts import OPENING_SCENE
 # The .env lives in the project root (one folder above v1/).
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 st.set_page_config(page_title="AI Escape Room · V1", page_icon="🔐", layout="centered")
 

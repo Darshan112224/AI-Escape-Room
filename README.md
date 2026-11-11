@@ -69,6 +69,9 @@ streamlit run v1/app.py
 
 The app opens at http://localhost:8501.
 
+> **Which model?** The default is `gemini-3.5-flash-lite`: on the free tier, Flash-Lite
+> models allow ~500 requests/day versus ~20/day for full Flash models.
+>
 > **"Model not found" error?** Google retires model names over time. The app falls
 > back to other Flash models automatically, but you can also run
 > `python v1/list_models.py` and copy a model name into `GEMINI_MODEL` in `.env`.

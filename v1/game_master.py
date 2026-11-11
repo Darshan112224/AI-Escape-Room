@@ -62,13 +62,16 @@ TIMEOUT_EXCEPTIONS = _timeout_exceptions()
 # 429 = too many requests (free-tier rate limit), 500/503 = server busy.
 RETRYABLE_CODES = {429, 500, 503}
 
-# Google retires model names every few months (e.g. gemini-2.5-flash -> 404).
-# If the configured model is gone, we automatically try these in order.
+# Backup models, tried in this order if the configured one fails.
+# Why Flash-LITE first? On the free tier the Lite models allow ~500 requests
+# per day, while the full Flash models allow only ~20, which is far too few
+# for a chat game where every player message costs one request.
+# Google also retires model names over time (e.g. gemini-2.5-flash -> 404).
 FALLBACK_MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
     "gemini-3.5-flash",
     "gemini-3.6-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-flash-lite",
     "gemini-flash-latest",  # alias that always points to the newest Flash
 ]
 
@@ -81,7 +84,7 @@ class GameMaster:
     def __init__(
         self,
         api_key: str,
-        model_name: str = "gemini-3.5-flash",
+        model_name: str = "gemini-3.5-flash-lite",
         temperature: float = 0.8,
         client: genai.Client | None = None,
     ):
