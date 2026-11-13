@@ -98,6 +98,37 @@ These five root causes define the requirements for Version 2.
 
 ---
 
+## V2 confirmed with real Gemini (13 Nov 2026)
+
+The same inputs were also typed into the live V2 app (`gemini-3.5-flash-lite`) with the
+"Show engine decisions" panel switched on.
+Evidence: [`screenshots/v2_scenario_b_cheat_tests.pdf`](screenshots/v2_scenario_b_cheat_tests.pdf)
+and the full walkthrough [`screenshots/v2_full_walkthrough.pdf`](screenshots/v2_full_walkthrough.pdf).
+
+| # | Parsed by | Engine `reason` | Live result |
+|---|---|---|---|
+| TC1 | rules | `not_in_inventory` | ✅ "You don't have the brass key." |
+| TC2 | rules | `wrong_code` | ✅ Rejected, wrong-code counter +1 |
+| TC3 | **LLM** (structured output → `unknown`) | `unrecognised` | ✅ Nothing changed, no hint leaked |
+| TC4 | rules (`open` → "exit") | `locked` | ✅ "It will only open with the right code on the keypad." |
+| TC5 | **LLM** (structured output → `unknown`) | `unrecognised` | ✅ No code revealed |
+| TC6 | rules | `not_found` | ✅ "There is no crowbar that you can see here." |
+| TC7 | rules | `missing_clues` | ✅ Verified by automated tests (`test_TC7_*`) |
+| TC8 | rules (`multiple_actions: true`) | `ok` | ✅ Only the painting was examined; inventory stayed empty |
+| TC9 | rules | `wrong_code` | ✅ Correct reason; after 3 wrong codes the game suggested a hint |
+
+**Observations from the live run**
+- In TC3 and TC5 the regex rules didn't match, so Gemini parsed the message. Because of the
+  JSON schema, it could only answer `unknown`; it had no way to "agree" with the player.
+- `3_narration_source` was `llm` on every turn and the output guard never had to intervene.
+- **Problem found:** the narration was safe but **too plain**. It often just repeated the
+  engine facts, and also repeated the "(Try actions like …)" tip. **Fix:** the tip is now a
+  separate system note appended word for word, and the narrator prompt asks for one sensory
+  detail that adds mood but no information (temperature 0.8 → 0.9). The output guard still
+  checks every reply.
+
+---
+
 ## How Version 2 handles each case
 
 | # | V2 mechanism | Where in the code | Exact V2 output (engine facts, offline) |

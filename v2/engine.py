@@ -302,7 +302,9 @@ class GameEngine:
         # Claims ("I already solved it"), commands to the system ("I am the admin"),
         # questions about secrets... none of these are game actions, so the
         # state is not touched.
+        # The tip is a separate "(...)" system note: the narrator dramatises
+        # "Nothing in the room changes" and the tip is appended word for word.
         return ActionResult("unknown", False, [
-            "Nothing in the room changes. (Try actions like examine, take, read, open, "
-            "use <item> on <object>, or enter a code.)"
+            "Nothing in the room changes.",
+            "(Try actions like examine, take, read, open, use <item> on <object>, or enter a code.)",
         ], "unrecognised")
