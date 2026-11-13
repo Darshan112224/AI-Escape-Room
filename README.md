@@ -14,7 +14,7 @@ The project is built in two versions:
 | Test cases passed | 4 / 9 | **9 / 9** |
 | Status | ✅ Done (tag `v1.0`) | ✅ Done |
 
-📄 **Project report (2 pages):** [`docs/report.md`](docs/report.md) · [PDF](docs/report.pdf)
+📄 **Project report (3 pages):** [`docs/report.md`](docs/report.md) · [PDF](docs/report.pdf)
 
 ---
 

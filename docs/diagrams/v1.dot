@@ -1,0 +1,17 @@
+digraph V1 {
+  rankdir=LR; dpi=200;
+  node [shape=box, fontname="Liberation Serif", fontsize=13, style=solid, color=black, margin="0.18,0.10"];
+  edge [fontname="Liberation Serif", fontsize=11, color=black];
+  player   [label="Player", shape=ellipse];
+  ui       [label="Streamlit UI\n(app.py)\nchat history in\nsession_state"];
+  gm       [label="Game Master client\n(game_master.py)"];
+  prompt   [label="System prompt\n(prompts.py)\nroom, rules\n+ solution"];
+  gemini   [label="Gemini API\ndecides AND narrates", style=bold];
+  player -> ui   [label="action text"];
+  ui -> gm       [label="full history"];
+  prompt -> gm;
+  gm -> gemini   [label="prompt + history"];
+  gemini -> gm   [label="reply (+ [ESCAPED])"];
+  gm -> ui       [label="reply, won?"];
+  ui -> player   [label="story / victory"];
+}

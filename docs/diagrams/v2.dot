@@ -1,0 +1,19 @@
+digraph V2 {
+  rankdir=LR; dpi=200; nodesep=0.5; ranksep=0.45;
+  node [shape=box, fontname="Liberation Serif", fontsize=13, color=black, margin="0.16,0.10"];
+  edge [fontname="Liberation Serif", fontsize=11, color=black];
+  player [label="Player\ntypes a message", shape=ellipse];
+  parser [label="1. Intent parser\nregex rules,\nGemini as backup"];
+  engine [label="2. Game engine\n(engine.py)\nvalidates actions\n(no LLM)", style=bold];
+  narr   [label="3. Narrator\nGemini writes text\n+ output guard"];
+  out    [label="Streamlit UI\nreply + sidebar\nwith real state", shape=ellipse];
+  state  [label="GameState\ninventory, flags,\npuzzles, door", shape=cylinder];
+  data   [label="game_data.json\nobjects, rules,\nsecret code", shape=note];
+  player -> parser [label="text"];
+  parser -> engine [label="Intent (JSON)"];
+  engine -> narr [label="facts only"];
+  narr -> out [label="safe reply"];
+  engine -> state [dir=both];
+  data -> engine;
+  {rank=same; engine; state; data}
+}
