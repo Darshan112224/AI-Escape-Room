@@ -113,7 +113,7 @@ and the full walkthrough [`screenshots/v2_full_walkthrough.pdf`](screenshots/v2_
 | TC4 | rules (`open` → "exit") | `locked` | ✅ "It will only open with the right code on the keypad." |
 | TC5 | **LLM** (structured output → `unknown`) | `unrecognised` | ✅ No code revealed |
 | TC6 | rules | `not_found` | ✅ "There is no crowbar that you can see here." |
-| TC7 | rules | `missing_clues` | ✅ Verified by automated tests (`test_TC7_*`) |
+| TC7 | rules | `missing_clues` | ✅ *"Typing numbers at random won't help; you haven't found all the clues for this lock yet."*. In V1, the same input escaped |
 | TC8 | rules (`multiple_actions: true`) | `ok` | ✅ Only the painting was examined; inventory stayed empty |
 | TC9 | rules | `wrong_code` | ✅ Correct reason; after 3 wrong codes the game suggested a hint |
 
